@@ -23,8 +23,7 @@ case $choice in
       docker buildx create --name "$BUILDER_NAME" --use
       docker buildx inspect --bootstrap
     fi
-    docker buildx build --platform linux/amd64,linux/arm64  -t $NAME:$CURR_TAG-amd64 .
-#    docker buildx build --platform linux/arm64 -t $NAME:$CURR_TAG-arm64 .
+    docker buildx build --platform linux/amd64,linux/arm64  -t $NAME:$CURR_TAG .
     ;;
   2)
     echo "Building the image for current platform only"
