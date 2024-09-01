@@ -1,0 +1,8 @@
+services:
+  vpn_service_1:
+    image: ericwastakenondocker/openconnect-proxy:latest
+    container_name: vpn_service_1
+    ports:
+      - "8222:8222" # EXPOSE the same port you entered in PROXY_PORT in your vpn1.env file
+    env_file:
+      - vpn1.env # Name this argument to match the .env file you create
