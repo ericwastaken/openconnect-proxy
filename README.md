@@ -2,6 +2,8 @@
 
 This is a Docker containerized version of Openconnect and OCProxy that establishes a SOCKS5 proxy through a VPN. The container requires specific environment variables to be set before running. Below are the steps to launch this container using both Docker CLI and Docker Compose.
 
+Once this container is running, you can configure any application that supports SOCKS5 PROXY to use **localhost** and the port you specified in the `PROXY_PORT` environment variable to connect to the VPN and access any resources available via the VPN.
+
 For more information on OpenConnect and OCProxy, visit the following links:
 * https://www.infradead.org/openconnect/
 * https://github.com/cernekee/ocproxy
@@ -105,6 +107,8 @@ Unfortunately, standard versions of Chrome, Edge and Safari do not support disti
 
 ### Proxy Support Notes
 
+The following environments and applications support sending your traffic via a SOCKS5 proxy:
+
 - **Windows Proxy All Traffic (not recommended)**
 
     It's possible to send all Windows traffic via the proxy. This is not ideal because you don't really want to send ALL TRAFFIC via the proxy.
@@ -119,7 +123,7 @@ Unfortunately, standard versions of Chrome, Edge and Safari do not support disti
 
     Set this up in SETTINGS, NETWORK, ADVANCED, PROXIES, and set the SOCKS Proxy to localhost:8222.
 
-- **Broser: Chrome (not recommended)**
+- **Browser: Chrome (not recommended)**
 
     Chrome uses the system proxy unfortunately, so it's not a great choice for the same reasons as proying macOS or Windows.
 
