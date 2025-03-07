@@ -17,7 +17,7 @@ This container is available on Docker Hub at [ericwastakenondocker/openconnect-p
 Before running the container, you need to define the following environment variables:
 
 - `USERNAME`
-- `PASSWORD`
+- `PASSWORD` or `PASSWORD_PATH` (if you want to use a file for the password, which is more secure)
 - `HOST`
 - `FINGERPRINT`
 - `FINGERPRINT_2` (optional)
@@ -31,7 +31,10 @@ Edit a copy of the provided template and create a `vpn1.env` file in your projec
 
 ```dotenv
 USERNAME=[your_username]
+# Less secure password as an environment variable
 PASSWORD=[your_password]
+# (if you want to use a file for the password)
+PASSWORD_PATH=[/path/to/password_file]
 HOST=[vpn_host]
 FINGERPRINT=[vpn_fingerprint]
 # FINGERPRINT_2=[vpn_fingerprint_2] (if needed - some hosts have 2 signatures)
@@ -78,7 +81,7 @@ To start the service with Docker Compose, run:
 docker-compose up -d
 ```
 
-## Additional Commands
+### Additional Docker Commands
 
 To stop the container:
 
@@ -92,9 +95,87 @@ To view the logs:
 docker-compose logs
 ```
 
+## Running with Docker Swarm
+
+To run the container using Docker Swarm (assuming you already enabled Docker Swarm), create a `docker-compose.yml` 
+file in your project directory:
+
+```yaml
+services:
+  vpn_service_1:
+    image: ericwastakenondocker/openconnect-proxy:latest
+    networks:
+      - vpn-service-1-net
+    configs:
+      - source: vpn-service-1-config
+        target: /run/configs/stack.env
+    secrets:
+      - vpn-service-1-secret
+    ports:
+      - "8222:8222"
+    entrypoint: ["/bin/sh", "-c", "set -a && . /run/configs/stack.env && /connect_vpn.sh"]
+
+networks:
+  vpn-service-1-net:
+    external: true
+
+secrets:
+  vpn-service-1-secret:
+    external: true
+
+configs:
+  vpn-service-1-config:
+    external: true
+```
+
+Create the network: (replace subnet as needed)
+
+```bash
+docker network create \
+  --driver=overlay \
+  --attachable \
+  --subnet=172.50.0.0/16 \
+ vpn-service-1-net
+```
+
+Create the vpn1.env file per the above instructions then edit further to use the correct path for the password 
+file from Docker Swarm secrets.
+
+```dotenv
+# REMOVE or COMMENT OUT the PASSWORD line
+# PASSWORD=[your_password]
+PASSWORD_PATH=/run/secrets/vpn-service-1-secret
+```
+
+Crete the config: (assuming you already created the vpn1.env file as explained above)
+
+```bash
+docker config create vpn-service-1-config vpn1.env
+```
+
+Create the secret:
+
+```bash
+echo "your-vpn-pass" | docker secret create vpn-service-1-secret -
+```
+
+To start the service with Docker Swarm, run:
+
+```bash
+docker stack deploy -c docker-compose.yml vpn-service-1-stack
+```
+
+### Additional Docker Swarm Commands
+
+To stop the service:
+
+```bash
+docker stack rm vpn-service-1-stack
+```
+
 ## Usage Notes
 
-- Ensure Docker and Docker Compose are installed on your machine.
+- Ensure Docker, Docker Compose, and Docker Swarm (if you're using Swarm) are installed on your machine.
 - Adapt environment variables according to your needs.
 - Ensure ports in the DOCKER CLI and `docker-compose.yml` match the `PROXY_PORT` variable!
 - You can have multiple .env files and multiple services in the `docker-compose.yml` file to run multiple VPN connections. Be sure to select different ports for the PROXY_PORT variable in each .env file and service so you can use them simultaneously.
