@@ -203,7 +203,7 @@ For local SAML workflow testing without a real VPN gateway, start the mock serve
 Then build the local image and start the included mock profile:
 
 ```sh
-docker build -t openconnect-proxy:saml-test .
+docker build --target saml -t openconnect-proxy:saml-test .
 cp test/mock-saml.env.template vpn-profiles/mock-saml.env
 docker compose -f docker-compose.yml -f docker-compose.saml.yml --env-file "vpn-profiles/mock-saml.env" -p "mock-saml" up -d --force-recreate
 ```
