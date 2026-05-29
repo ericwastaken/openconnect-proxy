@@ -1,5 +1,15 @@
 #!/bin/bash
 
+AUTH_MODE_NORMALIZED="$(printf '%s' "${AUTH_MODE:-password}" | tr '[:upper:]' '[:lower:]')"
+echo "AUTH_MODE=${AUTH_MODE:-password} normalized to ${AUTH_MODE_NORMALIZED}"
+
+if [ "$AUTH_MODE_NORMALIZED" = "saml" ]; then
+  echo "Starting SAML authentication workflow"
+  exec /connect_vpn_saml.sh
+fi
+
+echo "Starting password authentication workflow"
+
 # Figure out if we have 2 fingerprints and prepare the servercert argument
 if [ -n "$FINGERPRINT_2" ]; then
   FINGERPRINT_ARG="--servercert $FINGERPRINT --servercert $FINGERPRINT_2"

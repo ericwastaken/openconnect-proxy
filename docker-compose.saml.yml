@@ -1,0 +1,4 @@
+services:
+  vpn_service_1:
+    ports:
+      - "${SAML_AUTH_PORT:-8080}:${SAML_AUTH_PORT:-8080}"

@@ -24,6 +24,12 @@ Before running the container, you need to define the following environment varia
 - `AUTHGROUP`
 - `PROTOCOL`
 - `PROXY_PORT`
+- `AUTH_MODE` (optional, defaults to `password`; use `saml` for GlobalProtect SAML)
+- `SAML_AUTH_PORT` (required for `AUTH_MODE=saml`)
+- `SAML_MODE` (optional, defaults to `portal`)
+- `SAML_CLIENTOS` (optional, defaults to `Windows`)
+- `SAML_NO_VERIFY` (optional, defaults to `true`; only affects `gp-saml-gui` portal discovery)
+- `SAML_AUTH_ONLY` (optional, defaults to `false`; only for local SAML mock testing)
 
 See the example file `env.template` for more a template you can copy.
 
@@ -41,6 +47,14 @@ FINGERPRINT=[vpn_fingerprint]
 AUTHGROUP="[auth_group]"
 # One of the Protocols supported by OPENCONNECT https://www.infradead.org/openconnect/manual.html
 PROTOCOL=[gp|nc|pulse|f5|fortinet|array]
+AUTH_MODE=password
+# For GlobalProtect SAML only:
+# AUTH_MODE=saml
+# SAML_AUTH_PORT=8080
+# SAML_MODE=portal
+# SAML_CLIENTOS=Windows
+# SAML_NO_VERIFY=true
+# SAML_AUTH_ONLY=false
 PROXY_PORT=[8222-8229]
 ```
 
@@ -58,6 +72,28 @@ docker run -d \
 
 Be sure you expose the same port in the `-p 8222:8222` argument in the command line as you entered in the `PROXY_PORT` variable in your `vpn1.env` file.
 
+## Managing Profiles with the Helper Script
+
+This repo includes `x-start-vpn.sh`, a helper for choosing and starting VPN profiles without typing the full Docker Compose command each time.
+
+The script looks for VPN profile `.env` files in the project directory and in `./vpn-profiles`, shows which profiles are already running, warns about duplicate `PROXY_PORT` conflicts, and only offers profiles that can be started safely.
+
+Run it from the project directory:
+
+```sh
+./x-start-vpn.sh
+```
+
+After you select a profile, the script shows the equivalent Docker Compose command so you can run it manually in the future. It uses the profile file name as the Compose project namespace. For example, `vpn-profiles/vpn1.env` becomes project `vpn1`:
+
+```sh
+docker compose --env-file "vpn-profiles/vpn1.env" -p "vpn1" up -d
+```
+
+The `-p` flag is the Docker Compose project name. It is not strictly required for a single VPN profile, but it is recommended when using multiple profiles because it keeps each profile in its own Compose namespace.
+
+For a GlobalProtect SAML profile, set `AUTH_MODE=saml` and a unique `SAML_AUTH_PORT` in the profile. The helper automatically adds the SAML Compose override, checks both the proxy port and browser-login port for conflicts, shows the image it will use, and prints the equivalent manual command.
+
 ## Running with Docker Compose
 
 To run the container using Docker Compose, create a `docker-compose.yml` file in your project directory:
@@ -65,20 +101,120 @@ To run the container using Docker Compose, create a `docker-compose.yml` file in
 ```yaml
 services:
   vpn_service_1:
-    image: ericwastakenondocker/openconnect-proxy:latest
-    container_name: vpn_service_1
+    image: "${IMAGE:-ericwastakenondocker/openconnect-proxy:latest}"
+    container_name: "vpn_service_port_${PROXY_PORT}"
     ports:
-      - "8222:8222" # EXPOSE the same port you entered in PROXY_PORT in your vpn1.env file
-    env_file:
-      - vpn1.env
+      - "${PROXY_PORT}:${PROXY_PORT}"
+    environment:
+      AUTH_MODE: "${AUTH_MODE:-password}"
+      USERNAME: "${USERNAME}"
+      PASSWORD: "${PASSWORD:-}"
+      PASSWORD_PATH: "${PASSWORD_PATH:-}"
+      HOST: "${HOST}"
+      FINGERPRINT: "${FINGERPRINT}"
+      FINGERPRINT_2: "${FINGERPRINT_2:-}"
+      AUTHGROUP: "${AUTHGROUP}"
+      PROTOCOL: "${PROTOCOL}"
+      PROXY_PORT: "${PROXY_PORT}"
+      SAML_AUTH_PORT: "${SAML_AUTH_PORT:-8080}"
+      SAML_CLIENTOS: "${SAML_CLIENTOS:-Windows}"
+      SAML_MODE: "${SAML_MODE:-portal}"
+      SAML_NO_VERIFY: "${SAML_NO_VERIFY:-true}"
+      SAML_AUTH_ONLY: "${SAML_AUTH_ONLY:-false}"
 ```
 
-Ensure you have your `vpn1.env` file in the same directory as `docker-compose.yml`.
+Ensure you have your profile env file in the same directory as `docker-compose.yml` or under `vpn-profiles`.
 
 To start the service with Docker Compose, run:
 
 ```sh
-docker-compose up -d
+docker compose --env-file "vpn-profiles/vpn1.env" -p "vpn1" up -d
+```
+
+For a SAML profile, include the SAML override file so the browser-login port is exposed:
+
+```sh
+docker compose -f docker-compose.yml -f docker-compose.saml.yml --env-file "vpn-profiles/vpn1.env" -p "vpn1" up -d
+```
+
+For manual Docker Compose usage, `--env-file` is required unless the variables are already exported in your shell or stored in Compose's default `.env` file. The `-p` project name is optional for one profile, but required if you want multiple profiles to run side by side cleanly. The `-d` flag is optional; it runs the service in the background.
+
+## GlobalProtect SAML Authentication
+
+SAML mode is only for GlobalProtect (`PROTOCOL=gp`) portals or gateways that return SAML fields in the GlobalProtect prelogin response. If the portal only returns username/password fields, use `AUTH_MODE=password`.
+
+A SAML profile looks like this:
+
+```dotenv
+IMAGE=openconnect-proxy:saml-test
+USERNAME=your_username
+HOST=vpn.example.com
+FINGERPRINT=pin-sha256:...
+AUTHGROUP=""
+PROTOCOL=gp
+PROXY_PORT=8222
+AUTH_MODE=saml
+SAML_AUTH_PORT=18080
+SAML_MODE=portal
+SAML_CLIENTOS=Windows
+SAML_NO_VERIFY=true
+```
+
+Notes:
+
+- `HOST` can be `vpn.example.com` or `https://vpn.example.com`; SAML mode normalizes it before calling `gp-saml-gui`.
+- `SAML_MODE=portal` starts with `/global-protect/prelogin.esp`; `SAML_MODE=gateway` starts with `/ssl-vpn/prelogin.esp`.
+- `SAML_CLIENTOS=Windows` is a good default because some portals only expose SAML for supported desktop clients. `Mac` is also worth trying.
+- `SAML_NO_VERIFY=true` lets `gp-saml-gui` perform portal discovery even when the TLS chain is not trusted inside the container. The final OpenConnect connection still uses the configured `FINGERPRINT` pin.
+- `SAML_AUTH_ONLY=true` is for local mock testing. Do not use it for a real VPN profile.
+
+When SAML mode starts, open the printed noVNC URL:
+
+```text
+http://localhost:18080/vnc.html
+```
+
+Complete the login inside the browser window. After `gp-saml-gui` captures the SAML cookie, the container starts OpenConnect with `ocproxy`.
+
+Expected successful SAML log lines include:
+
+```text
+Starting SAML authentication workflow
+Got SAML REDIRECT, opening browser...
+[SAML   ] Got all required SAML headers, done.
+SAML login complete; starting OpenConnect and ocproxy.
+```
+
+If you see this, that portal is not offering SAML for the selected host/auth mode/client OS:
+
+```text
+prelogin response does not contain SAML tags
+```
+
+### Local SAML Mock Test
+
+For local SAML workflow testing without a real VPN gateway, start the mock server:
+
+```sh
+./test/x-mock-saml-start.sh
+```
+
+Then build the local image and start the included mock profile:
+
+```sh
+docker build -t openconnect-proxy:saml-test .
+cp test/mock-saml.env.template vpn-profiles/mock-saml.env
+docker compose -f docker-compose.yml -f docker-compose.saml.yml --env-file "vpn-profiles/mock-saml.env" -p "mock-saml" up -d --force-recreate
+```
+
+Open `http://localhost:18080/vnc.html` and complete the mock browser flow. The profile sets `SAML_AUTH_ONLY=true`, so the container exits after `gp-saml-gui` returns mock SAML values instead of starting OpenConnect.
+
+Expected mock success:
+
+```text
+[SAML   ] Got all required SAML headers, done.
+SAML_AUTH_ONLY=true; skipping OpenConnect startup.
+COOKIE=present
 ```
 
 ### Additional Docker Commands
@@ -243,8 +379,3 @@ The following environments and applications support sending your traffic via a S
 - **SSH over Termius or other Terminal Apps that support PROXY**
 
     You can use any Terminal app that supports a SOCKS 5 proxy. Just set the proxy accordingly in the app's setup.
-
-
-
-
-
