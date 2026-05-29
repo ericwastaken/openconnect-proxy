@@ -1,13 +1,51 @@
-x#!/bin/bash
+#!/bin/bash
 
 # Load environment variables from build-manifest.env
 source build-manifest.env
 
 # verify that we have the necessary environment variables
-if [ -z "$BUILDER_NAME" ] || [ -z "$NAME" ] || [ -z "$CURR_TAG" ]; then
-  echo "BUILDER_NAME, NAME and CURR_TAG must be set in build-manifest.env"
+if [ -z "$BUILDER_NAME" ] || [ -z "$NAME" ] || [ -z "$CURR_TAG" ] || [ -z "$SAML_TAG_SUFFIX" ]; then
+  echo "BUILDER_NAME, NAME, CURR_TAG and SAML_TAG_SUFFIX must be set in build-manifest.env"
   exit 1
 fi
+
+PLAIN_TAG="$NAME:$CURR_TAG"
+SAML_TAG="$NAME:$CURR_TAG$SAML_TAG_SUFFIX"
+
+echo "Build manifest version:"
+echo "  CURR_TAG=$CURR_TAG"
+echo "  Plain image: $PLAIN_TAG"
+echo "  SAML image:  $SAML_TAG"
+read -p "Is this the version you want to build? [y/N] " -n 1 -r
+echo
+if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+  echo "Build cancelled. Update build-manifest.env and run again."
+  exit 1
+fi
+
+echo "Which image variant do you want to build?"
+echo "1. Plain image only ($PLAIN_TAG)"
+echo "2. SAML image only ($SAML_TAG)"
+echo "3. Both"
+read -p "Enter your choice: " variant_choice
+case $variant_choice in
+  1)
+    BUILD_PLAIN=true
+    BUILD_SAML=false
+    ;;
+  2)
+    BUILD_PLAIN=false
+    BUILD_SAML=true
+    ;;
+  3)
+    BUILD_PLAIN=true
+    BUILD_SAML=true
+    ;;
+  *)
+    echo "Invalid choice!"
+    exit 1
+    ;;
+esac
 
 # ask if we want to build the image for multi platform or current platform only
 echo "Do you want to build the image for multi platform or current platform only?"
@@ -28,19 +66,27 @@ case $choice in
       docker buildx create --name "$BUILDER_NAME" --use
       docker buildx inspect --bootstrap
     fi
-    docker buildx build --platform linux/amd64,linux/arm64  -t $NAME:$CURR_TAG .
+    if [ "$BUILD_PLAIN" = true ]; then
+      docker buildx build --platform linux/amd64,linux/arm64 --target plain -t "$PLAIN_TAG" .
+    fi
+    if [ "$BUILD_SAML" = true ]; then
+      docker buildx build --platform linux/amd64,linux/arm64 --target saml -t "$SAML_TAG" .
+    fi
     ;;
   2)
     echo "Building the image for current platform only"
-    docker build -t $NAME:$CURR_TAG .
+    if [ "$BUILD_PLAIN" = true ]; then
+      docker build --target plain -t "$PLAIN_TAG" .
+    fi
+    if [ "$BUILD_SAML" = true ]; then
+      docker build --target saml -t "$SAML_TAG" .
+    fi
     ;;
   *)
     echo "Invalid choice!"
     exit 1
     ;;
 esac
-
-
 
 
 

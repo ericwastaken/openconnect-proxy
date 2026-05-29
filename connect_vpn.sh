@@ -4,6 +4,11 @@ AUTH_MODE_NORMALIZED="$(printf '%s' "${AUTH_MODE:-password}" | tr '[:upper:]' '[
 echo "AUTH_MODE=${AUTH_MODE:-password} normalized to ${AUTH_MODE_NORMALIZED}"
 
 if [ "$AUTH_MODE_NORMALIZED" = "saml" ]; then
+  if [ ! -x /connect_vpn_saml.sh ]; then
+    echo "AUTH_MODE=saml requires the SAML image variant. Use an image tagged with the SAML suffix, such as ericwastakenondocker/openconnect-proxy:<tag>-saml."
+    exit 1
+  fi
+
   echo "Starting SAML authentication workflow"
   exec /connect_vpn_saml.sh
 fi

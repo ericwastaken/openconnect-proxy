@@ -6,10 +6,43 @@ For more information on OpenConnect and OCProxy, visit the following links:
 * https://www.infradead.org/openconnect/
 * https://github.com/cernekee/ocproxy
 
+## Image Variants
+
+There are two Docker image variants:
+
+- `ericwastakenondocker/openconnect-proxy:latest` is the plain username/password image. Use this for normal OpenConnect password, Duo push, or OTP-style flows where OpenConnect can authenticate from stdin.
+- `ericwastakenondocker/openconnect-proxy:latest-saml` is the GlobalProtect SAML image. Use this when `AUTH_MODE=saml` and the VPN requires browser-based SAML authentication.
+
+Versioned tags follow the same pattern:
+
+```text
+ericwastakenondocker/openconnect-proxy:<version>
+ericwastakenondocker/openconnect-proxy:<version>-saml
+```
+
+The SAML image is much larger because it includes the browser/noVNC/Xvfb/WebKit stack needed to complete SAML login. If you do not need SAML, use the plain image.
+
+Set `IMAGE` in each VPN profile so the selected image is explicit.
+
+For a plain username/password profile:
+
+```dotenv
+IMAGE=ericwastakenondocker/openconnect-proxy:latest
+AUTH_MODE=password
+```
+
+For a GlobalProtect SAML profile:
+
+```dotenv
+IMAGE=ericwastakenondocker/openconnect-proxy:latest-saml
+AUTH_MODE=saml
+```
+
 ## Environment Variables
 
 Before running the container, you need to define the following environment variables:
 
+- `IMAGE`
 - `USERNAME`
 - `PASSWORD`
 - `HOST`
@@ -115,6 +148,8 @@ SAML mode is only for GlobalProtect (`PROTOCOL=gp`) portals or gateways that ret
 Set `AUTH_MODE=saml`, choose a unique `SAML_AUTH_PORT`, and open the printed noVNC URL, usually `http://localhost:<SAML_AUTH_PORT>/vnc.html`. Complete the browser login there. After `gp-saml-gui` captures the SAML cookie, the container starts OpenConnect with `ocproxy`.
 
 Use `SAML_MODE=portal` first. Try `SAML_MODE=gateway` or `SAML_CLIENTOS=Mac` only if the portal does not expose SAML for the default settings. `SAML_NO_VERIFY=true` only affects `gp-saml-gui` portal discovery; OpenConnect still uses your configured `FINGERPRINT` pin.
+
+The default Docker image is the smaller password-mode image. SAML profiles must use a SAML-capable image, such as `ericwastakenondocker/openconnect-proxy:latest-saml` or a local test image like `openconnect-proxy:saml-test`.
 
 ### Local SAML Mock Test
 

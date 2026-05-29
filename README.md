@@ -146,7 +146,7 @@ SAML mode is only for GlobalProtect (`PROTOCOL=gp`) portals or gateways that ret
 A SAML profile looks like this:
 
 ```dotenv
-IMAGE=openconnect-proxy:saml-test
+IMAGE=ericwastakenondocker/openconnect-proxy:latest-saml
 USERNAME=your_username
 HOST=vpn.example.com
 FINGERPRINT=pin-sha256:...
@@ -167,6 +167,7 @@ Notes:
 - `SAML_CLIENTOS=Windows` is a good default because some portals only expose SAML for supported desktop clients. `Mac` is also worth trying.
 - `SAML_NO_VERIFY=true` lets `gp-saml-gui` perform portal discovery even when the TLS chain is not trusted inside the container. The final OpenConnect connection still uses the configured `FINGERPRINT` pin.
 - `SAML_AUTH_ONLY=true` is for local mock testing. Do not use it for a real VPN profile.
+- The default Docker image is the smaller password-mode image. SAML profiles must use a SAML-capable image, such as `ericwastakenondocker/openconnect-proxy:latest-saml` or a local test image like `openconnect-proxy:saml-test`.
 
 When SAML mode starts, open the printed noVNC URL:
 
@@ -318,7 +319,16 @@ docker stack rm vpn-service-1-stack
 
 ## Building the Image
 
-Use the included `x_build.sh` script to build the container. The script will build the container and tag it with the version number in the `build-manifest.env` file. Edit the manifest file to change the version number and image name as needed.
+Use the included `x_build.sh` script to build the container. The script can build the smaller plain image, the SAML-capable image, or both. It tags the plain image as `NAME:CURR_TAG` and the SAML image as `NAME:CURR_TAG-saml` by default, using values from `build-manifest.env`.
+
+You can also build the variants manually:
+
+```sh
+docker build --target plain -t openconnect-proxy:plain-test .
+docker build --target saml -t openconnect-proxy:saml-test .
+```
+
+The plain image contains only OpenConnect and `ocproxy`. The SAML image adds the browser stack, noVNC, Xvfb, WebKit GTK, and `gp-saml-gui`, so it is expected to be much larger.
 
 Note this build supports multi-platform builds, which require Docker Buildx to be enabled and QEMU to be installed on the host machine. On macOS, buildx and QEMU are both part of Docker Desktop, but in other Linux distros, you might need to enable this. (See the [Docker Buildx documentation](https://docs.docker.com/buildx/working-with-buildx/) for more information.)
 
