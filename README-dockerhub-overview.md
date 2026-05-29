@@ -6,6 +6,7 @@ For more information on OpenConnect and OCProxy, visit the following links:
 * https://www.infradead.org/openconnect/
 * https://github.com/cernekee/ocproxy
 
+
 ## Image Variants
 
 There are two Docker image variants:
@@ -26,14 +27,14 @@ Set `IMAGE` in each VPN profile so the selected image is explicit.
 
 For a plain username/password profile:
 
-```dotenv
+```text
 IMAGE=ericwastakenondocker/openconnect-proxy:latest
 AUTH_MODE=password
 ```
 
 For a GlobalProtect SAML profile:
 
-```dotenv
+```text
 IMAGE=ericwastakenondocker/openconnect-proxy:latest-saml
 AUTH_MODE=saml
 ```
@@ -151,11 +152,6 @@ Use `SAML_MODE=portal` first. Try `SAML_MODE=gateway` or `SAML_CLIENTOS=Mac` onl
 
 The default Docker image is the smaller password-mode image. SAML profiles must use a SAML-capable image, such as `ericwastakenondocker/openconnect-proxy:latest-saml` or a local test image like `openconnect-proxy:saml-test`.
 
-### Local SAML Mock Test
-
-The GitHub repo includes `test/x-mock-saml-start.sh`, `test/mock-gp-saml-server.py`, and `test/mock-saml.env.template` for local SAML workflow testing without a real VPN gateway. Start the mock server, build `openconnect-proxy:saml-test`, copy the template to `vpn-profiles/mock-saml.env`, then start the mock profile with the SAML Compose override.
-
-Open `http://localhost:18080/vnc.html` for the mock browser flow. The mock profile sets `SAML_AUTH_ONLY=true`, so the container exits after `gp-saml-gui` returns mock SAML values instead of starting OpenConnect.
 
 ## Additional Commands
 
