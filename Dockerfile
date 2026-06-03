@@ -6,7 +6,8 @@ RUN apt-get update && \
     apt-get install -y \
       ca-certificates=20260223 \
       openconnect=9.12-3.3 \
-      ocproxy=1.60-1build7 && \
+      ocproxy=1.60-1build7 \
+      curl && \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* /tmp/* /var/tmp/*
 
 COPY connect_vpn.sh /connect_vpn.sh
@@ -32,8 +33,11 @@ RUN apt-get update && \
       websockify=0.13.0+dfsg1-2ubuntu1 \
       x11vnc=0.9.17-2 \
       xvfb=2:21.1.22-1ubuntu1 && \
+    sed -i 's/\[openssl_init\]/\[openssl_init\]\nssl_conf = ssl_sect/' /etc/ssl/openssl.cnf && \
+    printf "\n[ssl_sect]\nsystem_default = system_default_sect\n\n[system_default_sect]\nOptions = UnsafeLegacyRenegotiation\n" >> /etc/ssl/openssl.cnf && \
     python3 -m venv --system-site-packages /opt/gp-saml-gui && \
     /opt/gp-saml-gui/bin/pip install --no-deps "$GP_SAML_GUI_URL" && \
+    ln -s vnc.html /usr/share/novnc/index.html && \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* /tmp/* /var/tmp/*
 
 ENV PATH="/opt/gp-saml-gui/bin:${PATH}"

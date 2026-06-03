@@ -3,6 +3,25 @@
 # Load environment variables from build-manifest.env
 source build-manifest.env
 
+# Ask if this is a production build or a local test build
+echo "What type of build do you want to perform?"
+echo "1. Production Build (using build-manifest.env)"
+echo "2. Local Test Build (tags: openconnect-proxy:plain-test, openconnect-proxy:saml-test)"
+read -p "Enter your choice: " build_mode_choice
+
+if [ "$build_mode_choice" == "2" ]; then
+  echo "Setting up Local Test Build..."
+  PLAIN_TAG="openconnect-proxy:plain-test"
+  SAML_TAG="openconnect-proxy:saml-test"
+  
+  echo "Building both variants for current platform only..."
+  docker build --target plain -t "$PLAIN_TAG" .
+  docker build --target saml -t "$SAML_TAG" .
+  
+  echo "Local Test Build complete."
+  exit 0
+fi
+
 # verify that we have the necessary environment variables
 if [ -z "$BUILDER_NAME" ] || [ -z "$NAME" ] || [ -z "$CURR_TAG" ] || [ -z "$SAML_TAG_SUFFIX" ]; then
   echo "BUILDER_NAME, NAME, CURR_TAG and SAML_TAG_SUFFIX must be set in build-manifest.env"

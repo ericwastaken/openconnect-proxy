@@ -17,6 +17,7 @@ services:
       PROXY_PORT: "${PROXY_PORT}"
       SAML_AUTH_PORT: "${SAML_AUTH_PORT:-8080}"
       SAML_CLIENTOS: "${SAML_CLIENTOS:-Windows}"
+      SAML_USER_AGENT: "${SAML_USER_AGENT:-}"
       SAML_MODE: "${SAML_MODE:-portal}"
       SAML_NO_VERIFY: "${SAML_NO_VERIFY:-true}"
       SAML_AUTH_ONLY: "${SAML_AUTH_ONLY:-false}"

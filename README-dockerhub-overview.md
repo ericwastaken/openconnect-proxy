@@ -54,8 +54,9 @@ Before running the container, you need to define the following environment varia
 - `PROXY_PORT`
 - `AUTH_MODE` (optional, defaults to `password`; use `saml` for GlobalProtect SAML)
 - `SAML_AUTH_PORT` (required for `AUTH_MODE=saml`)
-- `SAML_MODE` (optional, defaults to `portal`)
+- `SAML_MODE` (optional, defaults to `portal`. Supports automatic gateway discovery.)
 - `SAML_CLIENTOS` (optional, defaults to `Windows`)
+- `SAML_USER_AGENT` (optional; spoofs a browser User-Agent for Duo/Okta checks)
 - `SAML_NO_VERIFY` (optional, defaults to `true`; only affects `gp-saml-gui` portal discovery)
 - `SAML_AUTH_ONLY` (optional, defaults to `false`; only for local SAML mock testing)
 
@@ -121,6 +122,7 @@ services:
       PROXY_PORT: "${PROXY_PORT}"
       SAML_AUTH_PORT: "${SAML_AUTH_PORT:-8080}"
       SAML_CLIENTOS: "${SAML_CLIENTOS:-Windows}"
+      SAML_USER_AGENT: "${SAML_USER_AGENT:-}"
       SAML_MODE: "${SAML_MODE:-portal}"
       SAML_NO_VERIFY: "${SAML_NO_VERIFY:-true}"
       SAML_AUTH_ONLY: "${SAML_AUTH_ONLY:-false}"
@@ -144,11 +146,11 @@ For manual Docker Compose usage, `--env-file` is required unless the variables a
 
 ## GlobalProtect SAML Authentication
 
-SAML mode is only for GlobalProtect (`PROTOCOL=gp`) portals or gateways that return SAML fields in the GlobalProtect prelogin response. If the portal only returns username/password fields, use `AUTH_MODE=password`.
+SAML mode is for GlobalProtect (`PROTOCOL=gp`) portals or gateways that require browser authentication. The image includes **Smart Discovery** logic that automatically detects if SAML is required at the Portal or Gateway level.
 
-Set `AUTH_MODE=saml`, choose a unique `SAML_AUTH_PORT`, and open the printed noVNC URL, usually `http://localhost:<SAML_AUTH_PORT>/vnc.html`. Complete the browser login there. After `gp-saml-gui` captures the SAML cookie, the container starts OpenConnect with `ocproxy`.
+Set `AUTH_MODE=saml`, choose a unique `SAML_AUTH_PORT`, and open the printed noVNC URL, usually `http://localhost:<SAML_AUTH_PORT>/`. Complete the browser login there. After `gp-saml-gui` captures the SAML cookie, the container starts OpenConnect.
 
-Use `SAML_MODE=portal` first. Try `SAML_MODE=gateway` or `SAML_CLIENTOS=Mac` only if the portal does not expose SAML for the default settings. `SAML_NO_VERIFY=true` only affects `gp-saml-gui` portal discovery; OpenConnect still uses your configured `FINGERPRINT` pin.
+Use `SAML_MODE=portal` first (it's the default and handles discovery). `SAML_USER_AGENT` defaults to a standard Chrome browser string to bypass OS checks from Duo/Okta.
 
 The default Docker image is the smaller password-mode image. SAML profiles must use a SAML-capable image, such as `ericwastakenondocker/openconnect-proxy:latest-saml` or a local test image like `openconnect-proxy:saml-test`.
 

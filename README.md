@@ -26,8 +26,9 @@ Before running the container, you need to define the following environment varia
 - `PROXY_PORT`
 - `AUTH_MODE` (optional, defaults to `password`; use `saml` for GlobalProtect SAML)
 - `SAML_AUTH_PORT` (required for `AUTH_MODE=saml`)
-- `SAML_MODE` (optional, defaults to `portal`)
+- `SAML_MODE` (optional, defaults to `portal`. See **Smart Discovery** below.)
 - `SAML_CLIENTOS` (optional, defaults to `Windows`)
+- `SAML_USER_AGENT` (optional; spoofs a browser User-Agent to satisfy Duo/Okta OS checks)
 - `SAML_NO_VERIFY` (optional, defaults to `true`; only affects `gp-saml-gui` portal discovery)
 - `SAML_AUTH_ONLY` (optional, defaults to `false`; only for local SAML mock testing)
 
@@ -53,6 +54,7 @@ AUTH_MODE=password
 # SAML_AUTH_PORT=8080
 # SAML_MODE=portal
 # SAML_CLIENTOS=Windows
+# SAML_USER_AGENT=
 # SAML_NO_VERIFY=true
 # SAML_AUTH_ONLY=false
 PROXY_PORT=[8222-8229]
@@ -118,6 +120,7 @@ services:
       PROXY_PORT: "${PROXY_PORT}"
       SAML_AUTH_PORT: "${SAML_AUTH_PORT:-8080}"
       SAML_CLIENTOS: "${SAML_CLIENTOS:-Windows}"
+      SAML_USER_AGENT: "${SAML_USER_AGENT:-}"
       SAML_MODE: "${SAML_MODE:-portal}"
       SAML_NO_VERIFY: "${SAML_NO_VERIFY:-true}"
       SAML_AUTH_ONLY: "${SAML_AUTH_ONLY:-false}"
@@ -141,38 +144,50 @@ For manual Docker Compose usage, `--env-file` is required unless the variables a
 
 ## GlobalProtect SAML Authentication
 
-SAML mode is only for GlobalProtect (`PROTOCOL=gp`) portals or gateways that return SAML fields in the GlobalProtect prelogin response. If the portal only returns username/password fields, use `AUTH_MODE=password`.
+SAML mode is designed for GlobalProtect (`PROTOCOL=gp`) portals or gateways that require browser-based authentication.
+
+### Smart Discovery (Under the Hood)
+
+The SAML image includes "Smart Discovery" logic. You typically only need to set `SAML_MODE=portal` (the default). If the Portal doesn't require SAML itself but one of its Gateways does, the container will:
+
+1.  **Probe the Portal**: Check if it requires SAML.
+2.  **Discover Gateways**: If not, it uses your `USERNAME` and `PASSWORD` to query the Portal for available Gateways.
+3.  **Target your Gateway**: It matches your `AUTHGROUP` to a specific Gateway host and probes it for SAML.
+4.  **Auto-Pivot**: If the Gateway requires SAML, the container automatically pivots the browser session to that Gateway.
 
 A SAML profile looks like this:
 
 ```dotenv
-IMAGE=ericwastakenondocker/openconnect-proxy:latest-saml
-USERNAME=your_username
-HOST=vpn.example.com
-FINGERPRINT=pin-sha256:...
-AUTHGROUP=""
-PROTOCOL=gp
-PROXY_PORT=8222
-AUTH_MODE=saml
-SAML_AUTH_PORT=18080
-SAML_MODE=portal
-SAML_CLIENTOS=Windows
-SAML_NO_VERIFY=true
+IMAGE=ericwastakenondocker/openconnect-proxy:latest-saml # Optional. Default: ericwastakenondocker/openconnect-proxy:latest
+USERNAME=your_username # Required
+PASSWORD=your_password # Optional. Required for "Smart Discovery" if SAML is triggered at the Gateway level
+HOST=vpn.example.com # Required. The VPN Portal/Gateway address
+FINGERPRINT=pin-sha256:... # Required. The certificate pin (one or more)
+AUTHGROUP="Your-Gateway-Name" # Required for GlobalProtect
+PROTOCOL=gp # Required. Set to 'gp' for GlobalProtect (only protocol supporting SAML currently)
+PROXY_PORT=8222 # Required. Port for the SOCKS/HTTP proxy
+AUTH_MODE=saml # Required for SAML workflow. Options: password (default), saml
+SAML_AUTH_PORT=18080 # Optional. Default: 8080. Port for the VNC/noVNC login interface
+# SAML_MODE=portal # Optional. Default: portal. Options: portal, gateway
+# SAML_CLIENTOS=Windows # Optional. Default: Windows. Options: Windows, Linux, Mac
+# SAML_USER_AGENT= # Optional. Defaults to a standard Chrome UA based on SAML_CLIENTOS
+# SAML_NO_VERIFY=true # Optional. Default: true. Ignore SSL errors during discovery/SAML probe
 ```
 
 Notes:
 
-- `HOST` can be `vpn.example.com` or `https://vpn.example.com`; SAML mode normalizes it before calling `gp-saml-gui`.
-- `SAML_MODE=portal` starts with `/global-protect/prelogin.esp`; `SAML_MODE=gateway` starts with `/ssl-vpn/prelogin.esp`.
-- `SAML_CLIENTOS=Windows` is a good default because some portals only expose SAML for supported desktop clients. `Mac` is also worth trying.
-- `SAML_NO_VERIFY=true` lets `gp-saml-gui` perform portal discovery even when the TLS chain is not trusted inside the container. The final OpenConnect connection still uses the configured `FINGERPRINT` pin.
-- `SAML_AUTH_ONLY=true` is for local mock testing. Do not use it for a real VPN profile.
-- The default Docker image is the smaller password-mode image. SAML profiles must use a SAML-capable image, such as `ericwastakenondocker/openconnect-proxy:latest-saml` or a local test image like `openconnect-proxy:saml-test`.
+- `HOST` can be `vpn.example.com` or `https://vpn.example.com`; SAML mode normalizes it automatically.
+- `SAML_MODE=portal` starts with `/global-protect/prelogin.esp`. This is the recommended starting point as discovery will handle gateways automatically.
+- `SAML_MODE=gateway` bypasses discovery and targets `/ssl-vpn/prelogin.esp` on the `HOST` directly.
+- `SAML_CLIENTOS=Windows` is a good default. Some portals only expose SAML for supported desktop clients.
+- `SAML_USER_AGENT`: If set, this overrides the browser's User-Agent. If left empty, it defaults to a standard Chrome-on-Windows (or Linux) string based on `SAML_CLIENTOS` to satisfy Duo/Okta security policies.
+- `SAML_NO_VERIFY=true` lets `gp-saml-gui` perform portal discovery even when the TLS chain is not trusted inside the container.
+- The default Docker image is the smaller password-mode image. SAML profiles must use a SAML-capable image.
 
 When SAML mode starts, open the printed noVNC URL:
 
 ```text
-http://localhost:18080/vnc.html
+http://localhost:18080/
 ```
 
 Complete the login inside the browser window. After `gp-saml-gui` captures the SAML cookie, the container starts OpenConnect with `ocproxy`.
@@ -208,7 +223,7 @@ cp test/mock-saml.env.template vpn-profiles/mock-saml.env
 docker compose -f docker-compose.yml -f docker-compose.saml.yml --env-file "vpn-profiles/mock-saml.env" -p "mock-saml" up -d --force-recreate
 ```
 
-Open `http://localhost:18080/vnc.html` and complete the mock browser flow. The profile sets `SAML_AUTH_ONLY=true`, so the container exits after `gp-saml-gui` returns mock SAML values instead of starting OpenConnect.
+Open `http://localhost:18080/` and complete the mock browser flow. The profile sets `SAML_AUTH_ONLY=true`, so the container exits after `gp-saml-gui` returns mock SAML values instead of starting OpenConnect.
 
 Expected mock success:
 
@@ -319,7 +334,9 @@ docker stack rm vpn-service-1-stack
 
 ## Building the Image
 
-Use the included `x_build.sh` script to build the container. The script can build the smaller plain image, the SAML-capable image, or both. It tags the plain image as `NAME:CURR_TAG` and the SAML image as `NAME:CURR_TAG-saml` by default, using values from `build-manifest.env`.
+Use the included `x_build.sh` script to build the container. The script provides an interactive menu to choose between production builds (multi-platform) or local test builds (current platform only). 
+
+Local test builds use the tags `openconnect-proxy:plain-test` and `openconnect-proxy:saml-test`.
 
 You can also build the variants manually:
 
