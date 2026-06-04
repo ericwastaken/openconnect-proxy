@@ -1,0 +1,31 @@
+services:
+  openconnect-proxy:
+    image: "${IMAGE:-ericwastakenondocker/openconnect-proxy:latest}"
+    networks:
+      - net-vpn-swarm
+    configs:
+      - source: vpn-config
+        target: /run/configs/stack.env
+    secrets:
+      - source: vpn-password
+        target: vpn_password
+    ports:
+      - "${PROXY_PORT:-8223}:${PROXY_PORT:-8223}"
+    environment:
+      PASSWORD_PATH: /run/secrets/vpn_password
+    entrypoint: ["/bin/sh", "-c", "set -a && . /run/configs/stack.env && /connect_vpn.sh"]
+    deploy:
+      restart_policy:
+        condition: on-failure
+
+networks:
+  net-vpn-swarm:
+    external: true
+
+secrets:
+  vpn-password:
+    external: true
+
+configs:
+  vpn-config:
+    external: true

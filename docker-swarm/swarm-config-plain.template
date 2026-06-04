@@ -1,0 +1,12 @@
+# Environment variables for Docker Swarm config (Plain Password)
+# This file should be used to create the external config:
+# docker config create vpn-config swarm-config-plain.template
+
+USERNAME=
+HOST=
+FINGERPRINT=
+FINGERPRINT_2=
+AUTHGROUP=
+PROTOCOL=
+PROXY_PORT=8223
+AUTH_MODE=password

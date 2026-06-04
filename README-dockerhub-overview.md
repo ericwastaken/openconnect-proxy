@@ -1,8 +1,10 @@
 # OpenConnect Proxy Docker Container
 
-This is a Docker containerized version of Openconnect and OCProxy that establishes a SOCKS5 proxy through a VPN. The container requires specific environment variables to be set before running. Below are the steps to launch this container using both Docker CLI and Docker Compose.
+This containerized version of OpenConnect and OCProxy establishes a SOCKS5 proxy through a VPN. It is designed to be highly flexible, supporting standard password authentication and browser-based SAML flows (specifically for GlobalProtect).
 
-For more information on OpenConnect and OCProxy, visit the following links:
+The repository includes a helper script `x-start-vpn.sh` that makes it easy to manage multiple VPN profiles across Docker Compose and Docker Swarm.
+
+For more information...
 * https://www.infradead.org/openconnect/
 * https://github.com/cernekee/ocproxy
 
@@ -52,6 +54,7 @@ Before running the container, you need to define the following environment varia
 - `AUTHGROUP`
 - `PROTOCOL`
 - `PROXY_PORT`
+- `PASSWORD_PATH` (Recommended for Swarm/Secrets: `/run/secrets/vpn-password`)
 - `AUTH_MODE` (optional, defaults to `password`; use `saml` for GlobalProtect SAML)
 - `SAML_AUTH_PORT` (required for `AUTH_MODE=saml`)
 - `SAML_MODE` (optional, defaults to `portal`. Supports automatic gateway discovery.)
@@ -155,18 +158,41 @@ Use `SAML_MODE=portal` first (it's the default and handles discovery). `SAML_USE
 The default Docker image is the smaller password-mode image. SAML profiles must use a SAML-capable image, such as `ericwastakenondocker/openconnect-proxy:latest-saml` or a local test image like `openconnect-proxy:saml-test`.
 
 
+## Running with Docker Swarm
+
+Docker Swarm provides a more robust way to manage VPN proxies across a cluster, with better handling of secrets and configurations.
+
+### Standard Password Deployment
+1. **Secret**: `echo "your-pass" | docker secret create vpn-password -`
+2. **Config**: Create a config from your `.env` file or the `swarm-config-plain.template` found in the GitHub repo.
+3. **Deploy**: Use `stack.yml` from the repo:
+   ```bash
+   docker stack deploy -c stack.yml vpn-service
+   ```
+
+### SAML Deployment
+1. **Secret**: `echo "your-pass" | docker secret create vpn-password-saml -`
+2. **Config**: Create a config with `AUTH_MODE=saml` and `PROTOCOL=gp`.
+3. **Deploy**: Use `stack.saml.yml` from the repo. Note that SAML mode requires exposing an additional port for the browser-based login.
+
+For detailed Swarm templates and instructions, see the `docker-swarm/` directory in the GitHub repository.
+
 ## Additional Commands
 
-To stop the container:
-
+To stop the container (Compose):
 ```sh
 docker-compose down
 ```
 
-To view the logs:
-
+To stop the service (Swarm):
 ```sh
-docker-compose logs
+docker stack rm vpn-service
+```
+
+To view logs:
+```sh
+docker-compose logs # Compose
+docker service logs vpn-service_openconnect-proxy # Swarm
 ```
 
 ## Usage Notes

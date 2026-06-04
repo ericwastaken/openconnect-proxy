@@ -1,0 +1,33 @@
+services:
+  openconnect-proxy-saml:
+    image: "${IMAGE:-ericwastakenondocker/openconnect-proxy:latest-saml}"
+    networks:
+      - net-vpn-swarm
+    configs:
+      - source: vpn-config-saml
+        target: /run/configs/stack.env
+    secrets:
+      - source: vpn-password-saml
+        target: vpn_password
+    ports:
+      - "${PROXY_PORT:-8223}:${PROXY_PORT:-8223}"
+      - "${SAML_AUTH_PORT:-8023}:${SAML_AUTH_PORT:-8023}"
+    environment:
+      AUTH_MODE: SAML
+      PASSWORD_PATH: /run/secrets/vpn_password
+    entrypoint: ["/bin/sh", "-c", "set -a && . /run/configs/stack.env && /connect_vpn.sh"]
+    deploy:
+      restart_policy:
+        condition: on-failure
+
+networks:
+  net-vpn-swarm:
+    external: true
+
+secrets:
+  vpn-password-saml:
+    external: true
+
+configs:
+  vpn-config-saml:
+    external: true

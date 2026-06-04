@@ -1,0 +1,18 @@
+# Environment variables for Docker Swarm config (SAML)
+# This file should be used to create the external config:
+# docker config create vpn-config-saml swarm-config-saml.template
+
+USERNAME=
+HOST=
+FINGERPRINT=
+FINGERPRINT_2=
+AUTHGROUP=
+PROTOCOL=gp
+PROXY_PORT=8223
+
+# Required for SAML
+AUTH_MODE=saml
+SAML_AUTH_PORT=8023
+SAML_MODE=portal
+SAML_CLIENTOS=Windows
+SAML_NO_VERIFY=true
